@@ -1,5 +1,6 @@
 import seaborn as sns
 import numpy as np
+import pandas as pd
 import itertools
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
@@ -95,8 +96,6 @@ def find_best_k(X_train, y_train, X_test, y_test, min_k=1, max_k=25):
             best_score = f1
     print("Best Value for k: {}".format(best_k))
     print("F1-Score: {}".format(best_score))
-
-# def find_best_threshold():
 
 def preds_proba_to_preds_class(preds_proba,threshold):
     """Transform prediction probabilities into classes (booleans) using a determined threshold
@@ -254,3 +253,89 @@ def print_corr(df, pct=0):
 
 #     def decision_trees(self, X=X_train, verbose=True):
 #         pass
+
+def prediction(X, model, stakes):
+    """The function will predict the class of a player depending on his stats and on the stakes of the game we are playing
+    
+    Args:
+        X (dataframe): Player's stat
+        stakes (str): Stakes of the game (small or high)
+    """
+
+    threshold_high_stakes = 0.397
+    threshold_small_stakes = 0.584
+    threshold = threshold_high_stakes if stakes == "high" else threshold_small_stakes
+    # print(f"threshold {threshold}")
+
+    # check and transform the format of the data if needed
+    if not isinstance(X, pd.DataFrame):
+        if isinstance(X, pd.Series):
+            X = X.to_frame().T
+        else:
+            X = pd.DataFrame.from_dict(X)
+
+    # rename columns
+    X.columns = X.columns.str.replace('\n',' ')
+    X.columns = X.columns.str.replace(' ','_')
+
+    # drop useless columns
+    for col in ['Player_Name', 'Site', "Hands", "Net_Won"]:
+        if col in X.columns:
+            X.drop([col], axis=1, inplace=True)
+
+    # adding polynomials and interactions to the dataframe
+    extra_features = [
+        'WTSD%_*_Won_$_at_SD',
+        'Won_$_at_SD_*_River_CBet%',
+        'Won_$_at_SD_*_Raise_Two_Raisers',
+        'Won_$_at_SD_*_vs_4Bet_Call',
+        'VP$IP_*_Flop_CBet%',
+        'VP$IP_*_Fold_to_River_CBet',
+        'PFR_*_River_CBet%',
+        'PFR_*_Fold_to_Turn_CBet',
+        'Squeeze_^2',
+        'Squeeze_^3',
+        'Squeeze_^4',
+        'Postflop_Agg%_^2',
+        'Postflop_Agg%_^3',
+        'Postflop_Agg%_^4',
+        'Won_$_at_SD_^2',
+        'Won_$_at_SD_^3',
+        'Won_$_at_SD_^4',
+        'Raise_Turn_CBet_^2',
+        'PFR_*_Flop_CBet%',
+        'PFR_*_Flop_CBet%_^2',
+        'PFR_*_Flop_CBet%_^3',
+        'VP$IP_*_Won_$_at_SD',
+        'VP$IP_*_Won_$_at_SD_^2',
+        'VP$IP_*_Won_$_at_SD_^3',
+        'Raise_Two_Raisers_^2',
+        'Raise_Two_Raisers_^3',
+        'Raise_Two_Raisers_^4',
+        'PFR_^2',
+        'PFR_^3',
+        'Fold_to_Turn_CBet_^2',
+        'Fold_to_Turn_CBet_^3',
+        '3Bet_^2',
+        '3Bet_^3'
+    ]
+
+    # Recreating interactions features
+    for feature in extra_features:
+        if "*" in feature and "^" not in feature:
+            features = feature.split("_*_")
+            X[feature] = np.array(X[features[0]]) * np.array(X[features[1]])
+
+    # Recreating polynomials features
+    for feature in extra_features:
+        if feature[-2:-1] == "^":
+            feature_to_poly = feature[:-3]
+            exp = feature[-1]
+            X[feature] = np.array(X[feature_to_poly]) ** int(exp)
+    # for col in X.columns:
+    #     print(f"{col}:{X[col]}")
+    preds_proba = np.array(model.predict_proba(X))[:,1]
+    print(preds_proba)
+    pred_class = preds_proba_to_preds_class(preds_proba, threshold)
+    print(f"pred_class {pred_class}")
+    return "Winner" if pred_class == 1 else "Loser"
