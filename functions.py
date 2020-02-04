@@ -274,42 +274,6 @@ def prediction(X, model, stakes="default"):
             X.drop([col], axis=1, inplace=True)
 
     # Add polynomials and interactions to the dataframe
-    extra_features = [
-        'WTSD%_*_Won_$_at_SD',
-        'Won_$_at_SD_*_River_CBet%',
-        'Won_$_at_SD_*_Raise_Two_Raisers',
-        'Won_$_at_SD_*_vs_4Bet_Call',
-        'VP$IP_*_Flop_CBet%',
-        'VP$IP_*_Fold_to_River_CBet',
-        'PFR_*_River_CBet%',
-        'PFR_*_Fold_to_Turn_CBet',
-        'Squeeze_^2',
-        'Squeeze_^3',
-        'Squeeze_^4',
-        'Postflop_Agg%_^2',
-        'Postflop_Agg%_^3',
-        'Postflop_Agg%_^4',
-        'Won_$_at_SD_^2',
-        'Won_$_at_SD_^3',
-        'Won_$_at_SD_^4',
-        'Raise_Turn_CBet_^2',
-        'PFR_*_Flop_CBet%',
-        'PFR_*_Flop_CBet%_^2',
-        'PFR_*_Flop_CBet%_^3',
-        'VP$IP_*_Won_$_at_SD',
-        'VP$IP_*_Won_$_at_SD_^2',
-        'VP$IP_*_Won_$_at_SD_^3',
-        'Raise_Two_Raisers_^2',
-        'Raise_Two_Raisers_^3',
-        'Raise_Two_Raisers_^4',
-        'PFR_^2',
-        'PFR_^3',
-        'Fold_to_Turn_CBet_^2',
-        'Fold_to_Turn_CBet_^3',
-        '3Bet_^2',
-        '3Bet_^3'
-    ]
-
     features_order = ['VP$IP',
                     'W$WSF%',
                     'WTSD%',
@@ -394,3 +358,148 @@ def prediction(X, model, stakes="default"):
     else:
         pred_class = "Losing Player"
     pprint(f"Playing a {stakes} stakes game we'll consider {player_name} a {pred_class}")
+
+class Prediction():
+    """This Class will predict the class (winning or losing) of a player depending on his stats and on the stakes of the game we are playing
+    
+    Args:
+        X (dataframe): Player's stat
+        model (classifier object): A fitted classifier model
+        stakes (str): Stakes of the game (small or high)
+    """
+    
+    def __init__(self, X, model, stakes="default"):
+        self.X = X
+        self.model = model
+        self.stakes = stakes
+        self.thresholds = {"default":0.5, "small":0.696, "high":0.326}
+        self.threshold = None
+
+    def get_stakes(self):
+        return self.stakes
+
+    def set_stakes(self, stakes):
+        self.stakes = stakes
+
+    def get_thresholds(self):
+        return self.thresholds
+
+    def set_thresholds(self, thresholds_dict):
+        self.thresholds = thresholds_dict
+    
+    def set_threshold(self, threshold_tuple):
+        self.thresholds[threshold_tuple[0]] = threshold_tuple[1]
+
+    def predict(self):
+        # Chosing default threshold if value entered for stakes ins't a key of the threshold dictionnary
+        if self.stakes not in self.thresholds.keys():
+            self.stakes = "default"
+            print(f"The value entered for stakes isn't recognized, therefore threshold default value: {self.thresholds[self.stakes]} was chosen")
+
+        # Chosing threshold
+        self.threshold = self.thresholds[self.stakes]
+
+        # Check and transform the format of the data if needed
+        if not isinstance(self.X, pd.DataFrame):
+            if isinstance(self.X, pd.Series):
+                self.X = self.X.to_frame().T
+            else:
+                self.X = pd.DataFrame.from_dict(self.X)
+
+        # Rename columns
+        self.X.columns = self.X.columns.str.replace('\n',' ')
+        self.X.columns = self.X.columns.str.replace(' ','_')
+
+        # Saving name
+        player_name = self.X.Player_Name.iloc[0]
+
+        # Drop useless columns
+        for col in ['Player_Name', 'Site', "Hands", "Net_Won"]:
+            if col in self.X.columns:
+                self.X.drop([col], axis=1, inplace=True)
+
+        # Add polynomials and interactions to the dataframe
+        features_order = ['VP$IP',
+                        'W$WSF%',
+                        'WTSD%',
+                        'Flop_CBet%',
+                        'Turn_CBet%',
+                        'River_CBet%',
+                        'Fold_to_Flop_Cbet',
+                        'Fold_to_River_CBet',
+                        'Raise_Flop_Cbet',
+                        'Raise_River_CBet',
+                        'Call_Two_Raisers',
+                        'vs_3Bet_Fold',
+                        'vs_3Bet_Call',
+                        'vs_3Bet_Raise',
+                        'vs_4Bet_Fold',
+                        'vs_4Bet_Call',
+                        'vs_4Bet_Raise',
+                        'WTSD%_*_Won_$_at_SD',
+                        'Won_$_at_SD_*_River_CBet%',
+                        'Won_$_at_SD_*_Raise_Two_Raisers',
+                        'Won_$_at_SD_*_vs_4Bet_Call',
+                        'VP$IP_*_Flop_CBet%',
+                        'VP$IP_*_Fold_to_River_CBet',
+                        'PFR_*_River_CBet%',
+                        'PFR_*_Fold_to_Turn_CBet',
+                        'Squeeze',
+                        'Squeeze_^2',
+                        'Squeeze_^3',
+                        'Squeeze_^4',
+                        'Postflop_Agg%',
+                        'Postflop_Agg%_^2',
+                        'Postflop_Agg%_^3',
+                        'Postflop_Agg%_^4',
+                        'Won_$_at_SD',
+                        'Won_$_at_SD_^2',
+                        'Won_$_at_SD_^3',
+                        'Won_$_at_SD_^4',
+                        'Raise_Turn_CBet',
+                        'Raise_Turn_CBet_^2',
+                        'PFR_*_Flop_CBet%',
+                        'PFR_*_Flop_CBet%_^2',
+                        'PFR_*_Flop_CBet%_^3',
+                        'VP$IP_*_Won_$_at_SD',
+                        'VP$IP_*_Won_$_at_SD_^2',
+                        'VP$IP_*_Won_$_at_SD_^3',
+                        'Raise_Two_Raisers',
+                        'Raise_Two_Raisers_^2',
+                        'Raise_Two_Raisers_^3',
+                        'Raise_Two_Raisers_^4',
+                        'PFR',
+                        'PFR_^2',
+                        'PFR_^3',
+                        'Fold_to_Turn_CBet',
+                        'Fold_to_Turn_CBet_^2',
+                        'Fold_to_Turn_CBet_^3',
+                        '3Bet',
+                        '3Bet_^2',
+                        '3Bet_^3']
+
+        # Recreating interactions features
+        for feature in features_order:
+            if "*" in feature and "^" not in feature:
+                features = feature.split("_*_")
+                self.X[feature] = np.array(self.X[features[0]]) * np.array(self.X[features[1]])
+
+        # Recreating polynomials features
+        for feature in features_order:
+            if feature[-2:-1] == "^":
+                feature_to_poly = feature[:-3]
+                exp = feature[-1]
+                self.X[feature] = np.array(self.X[feature_to_poly]) ** int(exp)
+        
+        # Set the X columns in the right order
+        self.X = self.X[features_order]
+
+        # Generate prediction probabilities
+        preds_proba = np.array(self.model.predict_proba(self.X))[:,1]
+        pred_class = preds_proba_to_preds_class(preds_proba, self.threshold)
+        pred_class = pred_class[0]
+        if pred_class == True:
+            pred_class = "Winning Player"
+        else:
+            pred_class = "Losing Player"
+        pprint(f"Playing a {self.stakes} stakes game we'll consider {player_name} a {pred_class}")
