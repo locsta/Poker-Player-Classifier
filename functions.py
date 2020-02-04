@@ -10,6 +10,7 @@ from sklearn.tree import export_graphviz
 from IPython.display import Image  
 from pydotplus import graph_from_dot_data
 from xgboost import plot_tree
+from pprint import pprint
 
 def plot_confusion_matrix(labels, preds_proba, classes, threshold=0.5, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
     """Calculate the confusion matrix for a determined threshold and plot it in a nicely formatted way
@@ -265,7 +266,7 @@ def prediction(X, model, stakes="default"):
     X.columns = X.columns.str.replace(' ','_')
 
     # Saving name
-    player_name = X.Player_Name
+    player_name = X.Player_Name.iloc[0]
 
     # Drop useless columns
     for col in ['Player_Name', 'Site', "Hands", "Net_Won"]:
@@ -381,13 +382,15 @@ def prediction(X, model, stakes="default"):
             exp = feature[-1]
             X[feature] = np.array(X[feature_to_poly]) ** int(exp)
     
+    # Set the X columns in the right order
     X = X[features_order]
-    # print(X.iloc[0])
-    # print("-"*100)
+
     # Generate prediction probabilities
     preds_proba = np.array(model.predict_proba(X))[:,1]
     pred_class = preds_proba_to_preds_class(preds_proba, threshold)
-    print(f"Player name: {player_name} Prediction probability {preds_proba} ---- Class predicted value: {pred_class}")
-    if pred_class:
-        return "Winning Player"
-    return "Losing Player"
+    pred_class = pred_class[0]
+    if pred_class == True:
+        pred_class = "Winning Player"
+    else:
+        pred_class = "Losing Player"
+    pprint(f"Playing a {stakes} stakes game we'll consider {player_name} a {pred_class}")
