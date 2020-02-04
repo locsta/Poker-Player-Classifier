@@ -232,58 +232,47 @@ def print_corr(df, pct=0):
     # Draw the heatmap with the mask and correct aspect ratio
     sns.heatmap(corr, mask=mask, cmap=cmap, vmax=1, center=0, square=True, linewidths=.5, cbar_kws={"shrink": .5})
 
-# class predictions():
-#     def __init__(self):
-#         self.predictions = "No predictions, you need to run a prediction Method first"
-#         self.model = "No model chosen yet"
 
-#     def print_metrics(self, labels=self.labels, preds=self.preds):
-#         print("Precision Score: {}".format(precision_score(labels, preds)))
-#         print("Recall Score: {}".format(recall_score(labels, preds)))
-#         print("Accuracy Score: {}".format(accuracy_score(labels, preds)))
-#         print("F1 Score: {}".format(f1_score(labels, preds)))
-
-#     def KNN(self, X=X_train, verbose=True):
-#         pass
-#         if verbose:
-#             self.print_metrics(labels, preds) #use self.params
-
-#     def logistic_reg(self, X=X_train, verbose=True):
-#         pass
-
-#     def decision_trees(self, X=X_train, verbose=True):
-#         pass
-
-def prediction(X, model, stakes):
+def prediction(X, model, stakes="default"):
     """The function will predict the class of a player depending on his stats and on the stakes of the game we are playing
     
     Args:
         X (dataframe): Player's stat
+        model (classifier object): A fitted classifier model
         stakes (str): Stakes of the game (small or high)
     """
+    
+    #Defining thresholds
+    thresholds = {"default":0.5, "small":0.696, "high":0.326}
 
-    threshold_high_stakes = 0.397
-    threshold_small_stakes = 0.584
-    threshold = threshold_high_stakes if stakes == "high" else threshold_small_stakes
-    # print(f"threshold {threshold}")
+    # Chosing default threshold if value entered for stakes ins't a key of the threshold dictionnary
+    if stakes not in thresholds.keys():
+        stakes = "default"
+        print(f"The value entered for stakes isn't recognized, therefore threshold default value: {thresholds[stakes]} was chosen")
 
-    # check and transform the format of the data if needed
+    # Chosing threshold
+    threshold = thresholds[stakes]
+
+    # Check and transform the format of the data if needed
     if not isinstance(X, pd.DataFrame):
         if isinstance(X, pd.Series):
             X = X.to_frame().T
         else:
             X = pd.DataFrame.from_dict(X)
 
-    # rename columns
+    # Rename columns
     X.columns = X.columns.str.replace('\n',' ')
     X.columns = X.columns.str.replace(' ','_')
 
-    # drop useless columns
+    # Saving name
+    player_name = X.Player_Name
+
+    # Drop useless columns
     for col in ['Player_Name', 'Site', "Hands", "Net_Won"]:
         if col in X.columns:
             X.drop([col], axis=1, inplace=True)
 
-    # adding polynomials and interactions to the dataframe
+    # Add polynomials and interactions to the dataframe
     extra_features = [
         'WTSD%_*_Won_$_at_SD',
         'Won_$_at_SD_*_River_CBet%',
@@ -320,22 +309,85 @@ def prediction(X, model, stakes):
         '3Bet_^3'
     ]
 
+    features_order = ['VP$IP',
+                    'W$WSF%',
+                    'WTSD%',
+                    'Flop_CBet%',
+                    'Turn_CBet%',
+                    'River_CBet%',
+                    'Fold_to_Flop_Cbet',
+                    'Fold_to_River_CBet',
+                    'Raise_Flop_Cbet',
+                    'Raise_River_CBet',
+                    'Call_Two_Raisers',
+                    'vs_3Bet_Fold',
+                    'vs_3Bet_Call',
+                    'vs_3Bet_Raise',
+                    'vs_4Bet_Fold',
+                    'vs_4Bet_Call',
+                    'vs_4Bet_Raise',
+                    'WTSD%_*_Won_$_at_SD',
+                    'Won_$_at_SD_*_River_CBet%',
+                    'Won_$_at_SD_*_Raise_Two_Raisers',
+                    'Won_$_at_SD_*_vs_4Bet_Call',
+                    'VP$IP_*_Flop_CBet%',
+                    'VP$IP_*_Fold_to_River_CBet',
+                    'PFR_*_River_CBet%',
+                    'PFR_*_Fold_to_Turn_CBet',
+                    'Squeeze',
+                    'Squeeze_^2',
+                    'Squeeze_^3',
+                    'Squeeze_^4',
+                    'Postflop_Agg%',
+                    'Postflop_Agg%_^2',
+                    'Postflop_Agg%_^3',
+                    'Postflop_Agg%_^4',
+                    'Won_$_at_SD',
+                    'Won_$_at_SD_^2',
+                    'Won_$_at_SD_^3',
+                    'Won_$_at_SD_^4',
+                    'Raise_Turn_CBet',
+                    'Raise_Turn_CBet_^2',
+                    'PFR_*_Flop_CBet%',
+                    'PFR_*_Flop_CBet%_^2',
+                    'PFR_*_Flop_CBet%_^3',
+                    'VP$IP_*_Won_$_at_SD',
+                    'VP$IP_*_Won_$_at_SD_^2',
+                    'VP$IP_*_Won_$_at_SD_^3',
+                    'Raise_Two_Raisers',
+                    'Raise_Two_Raisers_^2',
+                    'Raise_Two_Raisers_^3',
+                    'Raise_Two_Raisers_^4',
+                    'PFR',
+                    'PFR_^2',
+                    'PFR_^3',
+                    'Fold_to_Turn_CBet',
+                    'Fold_to_Turn_CBet_^2',
+                    'Fold_to_Turn_CBet_^3',
+                    '3Bet',
+                    '3Bet_^2',
+                    '3Bet_^3']
+
     # Recreating interactions features
-    for feature in extra_features:
+    for feature in features_order:
         if "*" in feature and "^" not in feature:
             features = feature.split("_*_")
             X[feature] = np.array(X[features[0]]) * np.array(X[features[1]])
 
     # Recreating polynomials features
-    for feature in extra_features:
+    for feature in features_order:
         if feature[-2:-1] == "^":
             feature_to_poly = feature[:-3]
             exp = feature[-1]
             X[feature] = np.array(X[feature_to_poly]) ** int(exp)
-    # for col in X.columns:
-    #     print(f"{col}:{X[col]}")
+    
+    X = X[features_order]
+    # print(X.iloc[0])
+    # print("-"*100)
+    # Generate prediction probabilities
     preds_proba = np.array(model.predict_proba(X))[:,1]
-    print(preds_proba)
     pred_class = preds_proba_to_preds_class(preds_proba, threshold)
-    print(f"pred_class {pred_class}")
-    return "Winner" if pred_class == 1 else "Loser"
+    print(f"Player name: {player_name} Prediction probability {preds_proba} ---- Class predicted value: {pred_class}")
+    if pred_class:
+        return "Winning Player"
+    return "Losing Player"
