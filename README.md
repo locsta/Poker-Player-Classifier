@@ -31,10 +31,12 @@ To build our model and make our predictions we followed the following steps:
 
 #### Classifying players in High Stakes Poker
 Our classifier will tell us 74 percent of the losers on the table and will make mistakes only 13% of the time when predicting losing players.
+
 ![](pictures/cm_high_stakes.png)
 
 #### Classifying players in Low Stakes Poker
 Our classifier will only tell us a third of the actual winners on the table but will make mistakes only 13% of the time when predicting winning players.
+
 ![](pictures/cm_small_stakes.png)
 
 ### Conclusions
